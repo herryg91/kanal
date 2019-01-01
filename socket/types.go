@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-redis/redis"
+	chRedis "github.com/herryg91/kanal/channel/redis"
 
 	"github.com/gorilla/websocket"
 )
@@ -21,8 +21,7 @@ type Socket struct {
 	Name string
 	Conn *websocket.Conn
 
-	redisClient   *redis.Client
-	channelEngine *redis.PubSub
+	channelEngine *chRedis.RedisChEngine
 
 	LastUpdate  time.Time
 	sendMessage chan []byte

@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-redis/redis"
 	"github.com/gorilla/websocket"
+	chRedis "github.com/herryg91/kanal/channel/redis"
 )
 
 func newSocket(name string, conn *websocket.Conn) *Socket {
@@ -14,7 +15,6 @@ func newSocket(name string, conn *websocket.Conn) *Socket {
 		Name: name,
 		Conn: conn,
 
-		redisClient:   nil,
 		channelEngine: nil,
 
 		LastUpdate:     time.Now(),
@@ -25,36 +25,27 @@ func newSocket(name string, conn *websocket.Conn) *Socket {
 		maxMessageSize: 512,
 	}
 
-	result.redisClient = redis.NewClient(&redis.Options{
+	redisClient := redis.NewClient(&redis.Options{
 		Addr:     "",
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
-
-	go result.subscribeChannel([]string{"test"})
-	go result.readPump()
-	go result.writePump()
+	result.channelEngine = chRedis.New(redisClient)
+	result.channelEngine.SetMessageReceive(func(channel string, pattern string, payload string) {
+		result.sendMessage <- []byte(payload)
+	})
 
 	result.Conn.SetCloseHandler(func(code int, text string) error {
 		result.channelEngine.Close()
 		return nil
 	})
+
+	result.channelEngine.Join("test")
+
+	go result.readPump()
+	go result.writePump()
+
 	return result
-}
-
-func (s *Socket) subscribeChannel(channelName []string) {
-	s.channelEngine = s.redisClient.Subscribe(channelName...)
-	for msg := range s.channelEngine.Channel() {
-		// channelName := msg.Channel
-		payload := msg.Payload
-		s.sendMessage <- []byte(payload)
-	}
-	log.Println("subscribe channel stopped")
-}
-
-func (s *Socket) changeChannel(channelName []string) {
-	s.channelEngine.Close()
-	go s.subscribeChannel(channelName)
 }
 
 func (s *Socket) readPump() {
@@ -75,7 +66,7 @@ func (s *Socket) readPump() {
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, []byte{'\n'}, []byte{' '}, -1))
 		// s.sendMessage <- message
-		s.redisClient.Publish("test", message)
+		s.channelEngine.SendMessage("test", string(message))
 	}
 }
 
