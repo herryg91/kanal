@@ -26,9 +26,9 @@ func newSocket(name string, conn *websocket.Conn) *Socket {
 	}
 
 	result.redisClient = redis.NewClient(&redis.Options{
-		Addr:     "128.199.176.180:6379",
-		Password: "foobared", // no password set
-		DB:       0,          // use default DB
+		Addr:     "",
+		Password: "", // no password set
+		DB:       0,  // use default DB
 	})
 
 	go result.subscribeChannel([]string{"test"})
